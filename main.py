@@ -1,22 +1,28 @@
-# This is a sample Python script.
-
-# Press Mayús+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
-from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, Settings, Document
-from llama_index.core.readers.base import BaseReader
-from llama_index.core.node_parser import SentenceSplitter
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-
-Settings.embed_model = HuggingFaceEmbedding(
-    model_name="BAAI/bge-small-en-v1.5"
+from llama_index.core import (
+    SimpleDirectoryReader,
+    VectorStoreIndex,
+    Settings,
+    StorageContext,
+    Document,
+    load_index_from_storage
 )
+from llama_index.core.readers.base import BaseReader
+from llama_index.core.node_parser import (
+    CodeSplitter
+)
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.llama_cpp import LlamaCPP
+from llama_index.llms.llama_cpp.llama_utils import (
+    messages_to_prompt,
+    completion_to_prompt,
+)
+from llama_index.vector_stores.duckdb import DuckDBVectorStore
+from IPython.display import Markdown, display
 
-SOURCE_CODE = "/home/josete/src/spring-fault-tolerance"
-
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+#SOURCE_CODE = '/home/josete/src/spring-fault-tolerance'
+SOURCE_CODE = '/Users/ou83mp/Developer/src/EngineeringProductivity/P16575-engineering-journey/src/pages'
+# MODEL_URL = "https://huggingface.co/lmstudio-ai/gemma-2b-it-GGUF/resolve/main/gemma-2b-it-q8_0.gguf"
+MODEL_URL = "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q2_K.gguf"
 
 
 class MyFileReader(BaseReader):
@@ -29,33 +35,80 @@ class MyFileReader(BaseReader):
 
 def parse_code():
     reader = SimpleDirectoryReader(
-        input_dir=SOURCE_CODE, file_extractor={".java": MyFileReader()}, recursive=True, errors='backslashreplace'
+        input_dir=SOURCE_CODE,
+        file_extractor={".md": MyFileReader()},
+        recursive=True,
+        errors='backslashreplace',
+        required_exts=[".md"],
+        exclude=[".git", ".idea"]
     )
 
-    documents = reader.load_data(num_workers=4)
+    documents = reader.load_data(num_workers=6, show_progress=True)
 
     print("Read ", len(documents))
 
-    text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=10)
+    text_splitter = CodeSplitter.from_defaults(language='java')
 
     Settings.text_splitter = text_splitter
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
     print("Embedded model")
 
-    # per-index
-    index = VectorStoreIndex.from_documents(documents, transformations=[text_splitter], show_progress=True)
+    vector_store = DuckDBVectorStore(database_name="my_vector_store.duckdb", persist_dir="duckdb_vectors")
+    storage_context = StorageContext.from_defaults(vector_store=vector_store)
+    index = VectorStoreIndex.from_documents(
+        documents=documents,
+        transformations=[text_splitter],
+        storage_context=storage_context,
+        show_progress=True)
 
-    index.as_query_engine()
+    # save index to disk
+    index.storage_context.persist()
 
-    print("Vector index creado")
+    DuckDBVectorStore.persist(vector_store, persist_path="./duckdb_vectors")
 
-    print(documents[1:2])
+    # load index from disk
+
+    storage_context = StorageContext.from_defaults(
+        vector_store=vector_store, persist_dir="./storage"
+    )
+    index = load_index_from_storage(storage_context=storage_context)
+    print("Index creado")
+
+    llm = LlamaCPP(
+        # You can pass in the URL to a GGML model to download it automatically
+        model_url=MODEL_URL,
+        # optionally, you can set the path to a pre-downloaded model instead of model_url
+        model_path=None,
+        temperature=0.1,
+        max_new_tokens=256,
+        # llama2 has a context window of 4096 tokens, but we set it lower to allow for some wiggle room
+        context_window=3900,
+        # kwargs to pass to __call__()
+        generate_kwargs={},
+        # kwargs to pass to __init__()
+        # set to at least 1 to use GPU
+        model_kwargs={"n_gpu_layers": 20},
+        # transform inputs into Llama2 format
+        messages_to_prompt=messages_to_prompt,
+        completion_to_prompt=completion_to_prompt,
+        verbose=True,
+    )
+
+    print("Initialised llm")
+
+    query_engine = index.as_query_engine(llm=llm)
+    # Ask as many questions as you want against the loaded data:
+    prompt = """
+He ejecutado el pipeline para inicializar DBaaS y para crear la matriz de SollAR y las NPAs que se han creado han sido SCHEMANAME_OWNER y USER con sus proxies (PROXY1, PROXY2) y los READ. Sin embargo, no hay forma de saber si son para TST, ACC o PRD (Tenemos otro asset en que las NPAs son SCHEMANAME_ENV_OWNER, etc.)
+Esto está bien? Es posible meter la misma NPA en diferentes safes (tenemos 3, TST, ACC y PRD)?
+"""
+    response = query_engine.query(prompt)
+    print(response)
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
     parse_code()
 
 # See PyCharm help at https://www.jetbrains.com/help/pycharm/
