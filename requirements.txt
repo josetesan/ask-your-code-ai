@@ -4,3 +4,8 @@ sentence-transformers
 llama-index-llms-llama-cpp
 llama-index-vector-stores-duckdb
 tree_sitter_languages
+transformers
+torch
+accelerate
+python-dotenv
+langchain-text-splitters

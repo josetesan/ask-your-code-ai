@@ -2,3 +2,5 @@
 .idea/
 storage
 duckdb_vectors
+.env
+duckdb_vectors
