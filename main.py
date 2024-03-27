@@ -8,7 +8,8 @@ from llama_index.core import (
 )
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.node_parser import (
-    CodeSplitter
+    CodeSplitter,
+    MarkdownNodeParser
 )
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
 from llama_index.llms.llama_cpp import LlamaCPP
@@ -47,7 +48,7 @@ def initialise():
 
     print("Read ", len(documents))
 
-    text_splitter = CodeSplitter.from_defaults(language='java')
+    text_splitter = MarkdownNodeParser()
 
     Settings.text_splitter = text_splitter
     Settings.embed_model = HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
@@ -88,7 +89,7 @@ def initialise():
         generate_kwargs={},
         # kwargs to pass to __init__()
         # set to at least 1 to use GPU
-        model_kwargs={"n_gpu_layers": 20},
+        model_kwargs={"n_gpu_layers": 0},
         # transform inputs into Llama2 format
         messages_to_prompt=messages_to_prompt,
         completion_to_prompt=completion_to_prompt,
