@@ -19,12 +19,13 @@ from llama_index.llms.llama_cpp.llama_utils import (
 )
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
 import gradio as gr
+import traceback
+import logging
 
 #SOURCE_CODE = '/home/josete/src/spring-fault-tolerance'
 SOURCE_CODE = '/Users/ou83mp/Developer/src/EngineeringProductivity/P16575-engineering-journey/src/pages'
 # MODEL_URL = "https://huggingface.co/lmstudio-ai/gemma-2b-it-GGUF/resolve/main/gemma-2b-it-q8_0.gguf"
 MODEL_URL = "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q2_K.gguf"
-
 
 class MyFileReader(BaseReader):
     def load_data(self, file, extra_info=None):
@@ -35,13 +36,18 @@ class MyFileReader(BaseReader):
 
 
 def initialise():
+
+    FORMAT = '%(asctime)s %(message)s'
+    logging.basicConfig(format=FORMAT)
+
+
     reader = SimpleDirectoryReader(
         input_dir=SOURCE_CODE,
         file_extractor={".md": MyFileReader()},
         recursive=True,
         errors='backslashreplace',
         required_exts=[".md"],
-        exclude=[".git", ".idea"]
+        exclude=[".git", ".idea",".png",".gif",".svg",".astro"]
     )
 
     documents = reader.load_data(num_workers=6, show_progress=True)
@@ -57,16 +63,28 @@ def initialise():
 
     vector_store = DuckDBVectorStore(database_name="my_vector_store.duckdb", persist_dir="duckdb_vectors")
     storage_context = StorageContext.from_defaults(vector_store=vector_store)
-    index = VectorStoreIndex.from_documents(
-        documents=documents,
-        transformations=[text_splitter],
-        storage_context=storage_context,
-        show_progress=True)
+    try:
+        index = VectorStoreIndex.from_documents(
+            documents=documents,
+            transformations=[text_splitter],
+            storage_context=storage_context,
+            show_progress=True)
+    except Exception as e:
+        traceback.print_exc(e)
+        raise e
 
     # save index to disk
-    index.storage_context.persist()
-
-    DuckDBVectorStore.persist(vector_store, persist_path="./duckdb_vectors")
+    try:
+       index.storage_context.persist()
+    except Exception as e:
+        traceback.print_exc(e)
+        raise e
+    
+    try:
+        DuckDBVectorStore.persist(vector_store, persist_path="./duckdb_vectors")
+    except Exception as e:
+        traceback.print_exc(e)
+        raise e
 
     # load index from disk
 
@@ -105,19 +123,27 @@ def initialise():
 
 def ask_the_journey(input_text):
     response = query_engine.query(input_text)
+    print(response)
     return response 
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     query_engine = initialise()
-    iface = gr.Interface(
-        fn=ask_the_journey,
-        inputs=gr.Textbox(lines=3, placeholder="Enter your query here"),
-        outputs=gr.Markdown(),
-        title="Journey chatbot",
-        description="EP Journey chatbot"
-    )
+    prompt = """
+He ejecutado el pipeline para inicializar DBaaS y para crear la matriz de SollAR y las NPAs que se han creado han sido SCHEMANAME_OWNER y USER con sus proxies (PROXY1, PROXY2) y los READ. Sin embargo, no hay forma de saber si son para TST, ACC o PRD (Tenemos otro asset en que las NPAs son SCHEMANAME_ENV_OWNER, etc.)
+ 
+Esto está bien? Es posible meter la misma NPA en diferentes safes (tenemos 3, TST, ACC y PRD)?"""
+    response = query_engine.query(prompt)
+    print(response)
 
-    iface.launch()
+#    iface = gr.Interface(
+#        fn=ask_the_journey,
+#        inputs=gr.Textbox(lines=3, placeholder="Enter your query here"),
+#        outputs=gr.Markdown(),
+#        title="Journey chatbot",
+#        description="EP Journey chatbot"
+#    )
+
+#    iface.launch()
 
