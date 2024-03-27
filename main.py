@@ -17,7 +17,7 @@ from llama_index.llms.llama_cpp.llama_utils import (
     completion_to_prompt,
 )
 from llama_index.vector_stores.duckdb import DuckDBVectorStore
-from IPython.display import Markdown, display
+import gradio as gr
 
 #SOURCE_CODE = '/home/josete/src/spring-fault-tolerance'
 SOURCE_CODE = '/Users/ou83mp/Developer/src/EngineeringProductivity/P16575-engineering-journey/src/pages'
@@ -33,7 +33,7 @@ class MyFileReader(BaseReader):
         return [Document(text=text, extra_info=extra_info or {})]
 
 
-def parse_code():
+def initialise():
     reader = SimpleDirectoryReader(
         input_dir=SOURCE_CODE,
         file_extractor={".md": MyFileReader()},
@@ -98,17 +98,25 @@ def parse_code():
     print("Initialised llm")
 
     query_engine = index.as_query_engine(llm=llm)
-    # Ask as many questions as you want against the loaded data:
-    prompt = """
-He ejecutado el pipeline para inicializar DBaaS y para crear la matriz de SollAR y las NPAs que se han creado han sido SCHEMANAME_OWNER y USER con sus proxies (PROXY1, PROXY2) y los READ. Sin embargo, no hay forma de saber si son para TST, ACC o PRD (Tenemos otro asset en que las NPAs son SCHEMANAME_ENV_OWNER, etc.)
-Esto está bien? Es posible meter la misma NPA en diferentes safes (tenemos 3, TST, ACC y PRD)?
-"""
-    response = query_engine.query(prompt)
-    print(response)
+
+    return query_engine
+
+
+def ask_the_journey(input_text):
+    response = query_engine.query(input_text)
+    return response 
 
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    parse_code()
+    query_engine = initialise()
+    iface = gr.Interface(
+        fn=ask_the_journey,
+        inputs=gr.Textbox(lines=3, placeholder="Enter your query here"),
+        outputs=gr.Markdown(),
+        title="Journey chatbot",
+        description="EP Journey chatbot"
+    )
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    iface.launch()
+
