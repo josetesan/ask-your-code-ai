@@ -2,12 +2,13 @@ from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, Settings,D
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from llama_index.llms.ollama import Ollama
 
 Settings.embed_model = HuggingFaceEmbedding(
     model_name="BAAI/bge-small-en-v1.5"
 )
 
-SOURCE_CODE =  "<my_source_code>"
+SOURCE_CODE =  "/Users/ou83mp/Developer/src/techday/spring-ftdemo"
 
 class MyFileReader(BaseReader):
     def load_data(self, file, extra_info=None):
@@ -23,12 +24,15 @@ def parse_code():
         input_dir=SOURCE_CODE, file_extractor={".java": MyFileReader()}, recursive=True, errors='backslashreplace'
     )
 
-    documents =  reader.load_data(num_workers=4)
+    documents =  reader.load_data(num_workers=10)
 
     print("Read ",len(documents))
 
-    vector_index = VectorStoreIndex.from_documents(documents)
-    vector_index.as_query_engine()
+    llm = Ollama(model="llama3.1", request_timeout=600.0)
+
+    vector_index = VectorStoreIndex.from_documents(documents,show_progress=True)
+    vector_index.as_query_engine(llm=llm)
+
 
     text_splitter = SentenceSplitter(chunk_size=512, chunk_overlap=10)
 
