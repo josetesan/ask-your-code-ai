@@ -2,13 +2,11 @@ from llama_index.core import SimpleDirectoryReader, VectorStoreIndex, Settings,D
 from llama_index.core.readers.base import BaseReader
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.embeddings.huggingface import HuggingFaceEmbedding
-from llama_index.llms.ollama import Ollama
+from llama_index.llms.lmstudio import LMStudio
 
-Settings.embed_model = HuggingFaceEmbedding(
-    model_name="BAAI/bge-small-en-v1.5"
-)
+Settings.embed_model =  HuggingFaceEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
-SOURCE_CODE =  "/Users/ou83mp/Developer/src/techday/spring-ftdemo"
+SOURCE_CODE =  "/Users/josete/src/spring-ftdemo"
 
 class MyFileReader(BaseReader):
     def load_data(self, file, extra_info=None):
@@ -28,7 +26,11 @@ def parse_code():
 
     print("Read ",len(documents))
 
-    llm = Ollama(model="llama3.1", request_timeout=600.0)
+    llm = LMStudio(
+        model_name="gemma-4-e4b-it",
+        base_url="http://localhost:1234/v1",
+        temperature=0.2,
+    )
 
     vector_index = VectorStoreIndex.from_documents(documents,show_progress=True)
     vector_index.as_query_engine(llm=llm)
